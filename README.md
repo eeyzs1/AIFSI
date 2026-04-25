@@ -1,2 +1,2 @@
-# SI
+# AIFSI
 ai for simultaneous interpretation
