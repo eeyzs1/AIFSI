@@ -1,0 +1,17 @@
+faster-whisper>=1.0.0
+f5-tts>=0.1.0
+sounddevice>=0.4.6
+soundfile>=0.12.1
+numpy>=1.24.0
+scipy>=1.11.0
+torch>=2.0.0
+torchaudio>=2.0.0
+opencv-python>=4.8.0
+moviepy>=1.0.3
+scenedetect[opencv]>=0.6.0
+easyocr>=1.7.0
+Pillow>=10.0.0
+webrtcvad>=2.0.10
+transformers>=4.35.0
+sentencepiece>=0.1.99
+protobuf>=3.20.0
