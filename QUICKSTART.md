@@ -9,21 +9,9 @@
 
 ### 安装步骤
 
-#### Windows
 ```bash
-# 1. 运行安装脚本
-setup.bat
-
-# 2. 验证安装
-python -c "import torch; print('GPU:', torch.cuda.is_available())"
-ffmpeg -version
-```
-
-#### Linux/macOS
-```bash
-# 1. 运行安装脚本
-chmod +x setup.sh
-./setup.sh
+# 1. 运行安装脚本（跨平台）
+python scripts/setup.py
 
 # 2. 验证安装
 python -c "import torch; print('GPU:', torch.cuda.is_available())"
@@ -34,42 +22,34 @@ ffmpeg -version
 
 ## 二、5分钟快速体验
 
-### 功能1: 端到端同声传译（推荐，无需参考音频）
+### 功能1: 同声传译（分段模式，推荐，无需参考音频）
 
 **准备工作：**
 - 无需录制参考音频
 
 **运行：**
 ```bash
+# 整句模式（默认）— 说完一句停顿1.5秒后翻译
 python seamless_interpreter.py --src-lang zh --tgt-lang eng
+
+# 分段模式 — 每3秒翻译一次，适合长时间持续说话
+python seamless_interpreter.py --src-lang zh --tgt-lang eng --mode chunk
 ```
 
 **效果：**
-- 对着麦克风说中文
-- **边说边翻译**，实时听到英文
+- 对着麦克风说中文，自动翻译成英文
 - 无需参考音频，内置多说话人声码器
 - 支持 101 种语言
 
-**技术要点：**
-- 端到端模型（SeamlessM4T v2）：一个模型完成语音→语音翻译
-- 无级联误差：不像传统方案需要 STT→翻译→TTS 三步
-- 国内下载加速：自动使用 hf-mirror.com 镜像
+**两种模式区别：**
+- 整句模式（默认）：说完一整句后停顿1.5秒触发翻译，适合短句对话
+- 分段模式（--mode chunk）：每N秒触发一次翻译，适合长时间持续说话
 
-**其他语言示例：**
-```bash
-# 中文→日文
-python seamless_interpreter.py --src-lang zh --tgt-lang jpn
-
-# 中文→韩文
-python seamless_interpreter.py --src-lang zh --tgt-lang kor
-
-# 英文→中文
-python seamless_interpreter.py --src-lang eng --tgt-lang cmn
-```
+> ⚠️ **关于流式同传（SeamlessStreaming + EMMA）：** `streaming/` 目录下曾有基于 EMMA 机制的流式同传实现，**当前无法正常运行，仅作为技术思路保留**。该方案依赖 fairseq2 + seamless_communication + SimulEval，存在严重的环境兼容性问题（仅限 Linux/WSL、fairseq2 无 Windows 支持、Blackwell GPU 需要大量 monkey-patch 等），实际运行效果不稳定。如需同声传译功能，请使用本功能（分段模式）或功能3（级联模式）。
 
 ---
 
-### 功能2: 流式同声传译（级联方案，支持声音克隆）
+### 功能2: 级联同传 + 声音克隆（需要参考音频）
 
 **准备工作：**
 1. 录制10秒参考音频（你自己的声音）
@@ -79,21 +59,16 @@ python seamless_interpreter.py --src-lang eng --tgt-lang cmn
 
 **运行：**
 ```bash
-python streaming_interpreter.py \
+python apps/cascade_interpreter.py \
   --ref-audio my_voice.wav \
   --ref-text "Hello, this is a test of voice cloning technology."
 ```
 
 **效果：**
 - 对着麦克风说中文
-- **边说边翻译**（不是录一段、翻译一段）
 - 实时听到英文翻译（用你的声音）
 - 延迟 < 2秒（从说话结束到播放开始）
-
-**技术要点：**
-- VAD（语音活动检测）：自动检测说话开始/结束
-- 流式处理：录音、转录、翻译、播放并行
-- 持续输入输出：适合直播卖货场景
+- 注意：这不是真正的流式同传，而是分段翻译。
 
 ---
 
@@ -128,13 +103,13 @@ python interpreter.py \
 **零样本克隆（F5-TTS）：**
 ```bash
 # 1. 注册你的声音（10秒）
-python demo/voice_manager.py register \
+python apps/voice_manager.py register \
   --name "我的声音" \
   --audio my_voice.wav \
   --text "Hello, this is a test of voice cloning technology."
 
 # 2. 立即使用
-python demo/voice_manager.py speak \
+python apps/voice_manager.py speak \
   --name "我的声音" \
   --text "Artificial intelligence is transforming the world." \
   --output zero_shot.wav
@@ -143,18 +118,18 @@ python demo/voice_manager.py speak \
 **传统微调方案（XTTS）：**
 ```bash
 # 1. 准备数据集（需要 10-30 分钟音频）
-python demo/voice_finetune.py prepare \
+python apps/voice_finetune.py prepare \
   --audio-dir ./voice_samples \
   --output ./dataset
 
 # 2. 微调模型（需要 2-8 小时 + GPU）
-python demo/voice_finetune.py train \
+python apps/voice_finetune.py train \
   --dataset ./dataset \
   --output ./models/my_voice \
   --steps 1000
 
 # 3. 使用微调模型
-python demo/voice_finetune.py infer \
+python apps/voice_finetune.py infer \
   --model ./models/my_voice \
   --text "Artificial intelligence is transforming the world." \
   --output finetuned.wav
@@ -181,7 +156,7 @@ python demo/voice_finetune.py infer \
 
 **运行：**
 ```bash
-python demo/video_translate.py test_video.mp4 \
+python apps/video_translate.py test_video.mp4 \
   --ref-audio my_voice.wav \
   --ref-text "Hello, this is a test of voice cloning technology." \
   --output translated.mp4
@@ -195,7 +170,23 @@ python demo/video_translate.py test_video.mp4 \
 
 ---
 
-## 三、常见问题
+## 三、同声传译方案对比
+
+| 维度 | 分段翻译（SeamlessM4T） | 级联方案（Whisper+F5-TTS） | ⚠️ 流式同传（EMMA，不可用） |
+|---|---|---|---|
+| **实时性** | ❌ 攒一段翻一段 | ❌ 攒一段翻一段 | 理论上边听边翻 |
+| **延迟** | 1.5-5秒 | < 2秒 | 理论320ms+ |
+| **声音克隆** | ❌ 不支持（内置声码器） | ✅ 用你的声音 | ❌ 不支持 |
+| **语言支持** | 101种 | 取决于Whisper | 37种 |
+| **GPU需求** | 4GB+ | 4GB+ | 8GB+ |
+| **环境** | 跨平台 | 跨平台 | 仅Linux/WSL |
+| **安装复杂度** | 低 | 低 | 极高（不可用） |
+| **可用状态** | ✅ 可用 | ✅ 可用 | ❌ 仅作思路参考 |
+| **适用场景** | 对话、演讲 | 需要特定声音 | — |
+
+---
+
+## 四、常见问题
 
 ### Q1: 没有 GPU 怎么办？
 **A:** 可以运行，但速度会很慢。建议：
@@ -213,24 +204,35 @@ python demo/video_translate.py test_video.mp4 \
 - Whisper large-v3: ~3GB
 - F5-TTS: ~1.5GB
 - SeamlessM4T v2: ~9GB
+- SeamlessStreaming: ~5GB
 - 国内自动使用 hf-mirror.com 加速下载
 - 下载完成后会缓存，后续运行很快
 
 ### Q4: SeamlessM4T 和 Whisper+F5-TTS 方案怎么选？
 **A:**
-- **需要声音克隆（用特定人的声音）** → 选 Whisper+F5-TTS 级联方案（streaming_interpreter.py）
-- **需要多语言互译（不只是中→英）** → 选 SeamlessM4T（seamless_interpreter.py）
-- **不想录制参考音频** → 选 SeamlessM4T
+- **需要声音克隆（用特定人的声音）** → 选 Whisper+F5-TTS 级联方案（cascade_interpreter.py）
+- **不想录制参考音频** → 选 SeamlessM4T（seamless_interpreter.py）
 - **追求翻译质量（避免级联误差）** → 选 SeamlessM4T
 
-### Q5: 声音克隆效果不好
+### Q5: 流式同传（SeamlessStreaming）能用吗？
+**A:** **当前不可用，仅作为技术思路保留。** `streaming/` 目录下的流式同传代码存在严重的环境兼容性问题：fairseq2 仅支持 Linux、0.2.x 与 0.8.x API 不兼容、Blackwell GPU 需要大量 monkey-patch、WSL 音频设备支持不完善等。如需同声传译功能，请使用 `seamless_interpreter.py`（分段模式）或 `cascade_interpreter.py`（级联模式）。
+
+### Q6: WSL 下麦克风不工作
+**A:** WSL 需要配置 PulseAudio 来访问 Windows 麦克风：
+```bash
+# 在 Windows 上安装 PulseAudio 服务器
+# 在 WSL 中设置环境变量
+export PULSE_SERVER=tcp:$(hostname).local
+```
+
+### Q7: 声音克隆效果不好
 **A:** 检查参考音频质量：
 - 时长：10-15秒最佳
 - 格式：WAV，16kHz 或 24kHz
 - 质量：无背景噪音，说话清晰
 - 内容：最好是完整句子，不要单个词
 
-### Q6: 视频翻译报错
+### Q8: 视频翻译报错
 **A:** 检查：
 1. 视频格式是否支持（MP4/AVI/MOV）
 2. 视频是否损坏（用播放器测试）
@@ -238,13 +240,13 @@ python demo/video_translate.py test_video.mp4 \
 
 ---
 
-## 四、进阶使用
+## 五、进阶使用
 
 ### 批量处理多个视频
 ```bash
 # 创建批处理脚本
 for video in *.mp4; do
-  python demo/video_translate.py "$video" \
+  python apps/video_translate.py "$video" \
     --ref-audio my_voice.wav \
     --ref-text "..." \
     --output "translated_$video"
@@ -254,23 +256,26 @@ done
 ### 自定义字幕区域（去字幕）
 ```bash
 # 手动指定字幕位置（更快更准）
-python demo/remove_subtitles.py input.mp4 \
+python apps/remove_subtitles.py input.mp4 \
   --subtitle-region "0,900,1920,180" \
   --output clean.mp4
 ```
 
-### AI混剪指定关键词
+### 流式同传自定义参数（⚠️ 实验性，当前不可用）
+
+> ⚠️ 以下参数仅适用于 `streaming/seamless_streaming_mic.py`，该方案当前无法正常运行，仅作思路参考。
+
 ```bash
-# 提取包含"精彩"、"高潮"的片段
-python demo/auto_edit.py long_video.mp4 \
-  --duration 60 \
-  --keywords "精彩,高潮,笑声" \
-  --output highlight.mp4
+# 调整分段大小（更小=更低延迟，但可能断句不准）
+python seamless_streaming_mic.py --src-lang cmn --tgt-lang eng --segment-size 160
+
+# 调整决策阈值（更低=更早开始翻译）
+python seamless_streaming_mic.py --src-lang cmn --tgt-lang eng --decision-threshold 0.3
 ```
 
 ---
 
-## 五、性能优化
+## 六、性能优化
 
 ### GPU 显存不足
 ```bash
@@ -278,7 +283,7 @@ python demo/auto_edit.py long_video.mp4 \
 python interpreter.py --ref-audio voice.wav --ref-text "..." --model-size small
 
 # video_translate.py 同理
-python demo/video_translate.py input.mp4 --model-size small ...
+python apps/video_translate.py input.mp4 --model-size small ...
 ```
 
 ### 加速视频处理
@@ -288,9 +293,13 @@ python demo/video_translate.py input.mp4 --model-size small ...
 # -c:v libx264 -preset ultrafast -crf 28
 ```
 
+### 流式同传优化（⚠️ 实验性，当前不可用）
+- 该方案当前无法正常运行，仅作思路参考
+- 理论优化方向：减小 `--segment-size` 降低延迟（但可能影响质量）
+
 ---
 
-## 六、故障排查
+## 七、故障排查
 
 ### 日志查看
 所有模块都会输出详细日志，出错时查看：
@@ -319,14 +328,14 @@ ffmpeg -version
 rm -rf ~/.cache/huggingface
 rm -rf ~/.cache/torch
 
-# 重新安装
+# 重新安装主项目
 pip uninstall -y faster-whisper f5-tts
 pip install faster-whisper f5-tts
 ```
 
 ---
 
-## 七、更多文档
+## 八、更多文档
 
 - 查看 [docs/design/](docs/design/) 目录的技术设计文档
 - 查看 [docs/dependencies.md](docs/dependencies.md) 了解依赖安装详情
